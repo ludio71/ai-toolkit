@@ -103,3 +103,9 @@ Zakończ **jedną** rekomendacją:
 - Nie przepisujesz kodu, którego zmiana nie dotknęła
 - Nie zgłaszasz preferencji stylistycznych, które załatwia formatter
 - Nie mnożysz findingów o tej samej przyczynie — jeden wpis, lista wystąpień
+
+## Kalibracja wagi findingów
+
+Przy wątpliwości, czy coś jest `Critical`, `Warning` czy `Suggestion` — rozstrzyga
+`references/severity-guide.md`. Waga wynika ze skutku na produkcji, nie z tego, jak bardzo
+coś drażni przy czytaniu.

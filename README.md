@@ -55,6 +55,44 @@ npm install @ludio71/ai-toolkit
 
 `postinstall` układa artefakty na miejscu. Ręcznie: `npx ai-toolkit install`.
 
+## Projekt bez `package.json` (Python, Go, Rust)
+
+Paczka jest npm-owa, ale artefakty w niej to zwykłe pliki tekstowe — projekt konsumenta
+nie musi mieć nic wspólnego z JavaScriptem. Potrzebny jest wyłącznie zainstalowany Node
+(≥20), żeby uruchomić instalator.
+
+Różnica jest jedna: zamiast dodawać zależność do `package.json`, wołasz instalator wprost.
+
+```bash
+cd ~/projekty/moj-projekt-python      # katalog z pyproject.toml, go.mod, Cargo.toml…
+
+printf '@ludio71:registry=https://npm.pkg.github.com\n' > .npmrc
+printf '//npm.pkg.github.com/:_authToken=${GH_PKG_TOKEN}\n' >> .npmrc
+
+export GH_PKG_TOKEN="$(gh auth token)"   # albo raz: npm login --scope=@ludio71 …
+npx @ludio71/ai-toolkit@latest install
+```
+
+Efekt jest identyczny jak w projekcie npmowym:
+
+```text
+moj-projekt-python/
+├── pyproject.toml
+├── CLAUDE.md                      ← blok reguł między znacznikami
+└── .claude/
+    ├── .ai-toolkit-manifest.json
+    └── skills/code-review/
+        ├── SKILL.md
+        └── references/severity-guide.md
+```
+
+W katalogu nie powstaje `node_modules` ani `package.json` — `npx` rozpakowuje paczkę do
+własnego cache, a instalator kopiuje z niego pliki do projektu. Aktualizacja to ponowne
+`npx @ludio71/ai-toolkit@latest install`, deinstalacja — `npx @ludio71/ai-toolkit uninstall`.
+
+> Ten tryb jest **kopiujący**, nie linkujący: cache `npx` jest ulotny, więc dowiązania
+> symboliczne przestałyby działać zaraz po zakończeniu komendy.
+
 ## Aktualizacja i deinstalacja
 
 ```bash

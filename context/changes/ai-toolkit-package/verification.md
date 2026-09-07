@@ -54,3 +54,32 @@ $ gh api user/packages/npm/ai-toolkit/versions
 - 0.2.0  2026-09-07T19:36:58Z
 - 0.1.0  2026-09-07T19:35:00Z
 ```
+
+## Uzupełnienie 2026-09-07 — regresja wykryta poza npm
+
+Pytanie „jak zaciągnąć skille do projektu w Pythonie" odsłoniło błąd, którego nie widziała
+żadna z dotychczasowych 16 asercji.
+
+`findProjectRoot()` — w tej postaci wzięty z template'u lekcji — szukał korzenia projektu,
+idąc w górę do pierwszego katalogu `node_modules`. Przy `npx @ludio71/ai-toolkit install`
+pierwszym trafionym `node_modules` jest **cache npx**
+(`~/.npm/_npx/<hash>/node_modules/@ludio71/ai-toolkit`), więc skille lądowały w katalogu
+tymczasowym i znikały razem z nim. Projekt użytkownika zostawał pusty, a komenda kończyła się
+komunikatem o sukcesie.
+
+Błąd trafiał dokładnie w ten scenariusz, dla którego `npx` w ogóle istnieje: projekty bez
+`package.json` (Python, Go, Rust). W projekcie npmowym `npm install` działał poprawnie, więc
+weryfikacja przez `PROJECT_ROOT` go nie łapała.
+
+Naprawa (`0.2.1`):
+
+- cache npx rozpoznawany po segmencie ścieżki `_npx` i odrzucany jako kandydat na korzeń
+- fallback na `INIT_CWD` (katalog wywołania komendy), potem `process.cwd()`
+- `postinstall` odpalony w cache npx kończy się bez zapisu — instaluje dopiero jawne
+  `ai-toolkit install`
+- `uninstall.js` korzysta z tej samej funkcji, bo miał identyczny błąd
+
+Weryfikacja rozszerzona o sekcję 5 (**21 asercji**): rozpoznanie cache npx, instalacja
+i deinstalacja w projekcie z `pyproject.toml` zamiast `package.json`. Potwierdzone na żywym
+rejestrze — `npx @ludio71/ai-toolkit@latest install` w katalogu Pythonowym układa
+`.claude/skills/` i blok w `CLAUDE.md`, nie tworząc `node_modules`.

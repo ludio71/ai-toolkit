@@ -133,10 +133,30 @@ w `.claude/.ai-toolkit-manifest.json`.
 
 ## Aktualizacja i deinstalacja
 
-```bash
-npm update @ludio71/ai-toolkit   # podbicie wersji
-npx ai-toolkit uninstall         # czyste usuniecie
+Komenda zależy od tego, czy paczka jest zadeklarowaną zależnością projektu:
+
+| Projekt | Aktualizacja | Deinstalacja |
+| ------- | ------------ | ------------ |
+| z `package.json` | `npm update @ludio71/ai-toolkit` | `npx ai-toolkit uninstall` |
+| bez `package.json` | `npx @ludio71/ai-toolkit@latest install` | `npx @ludio71/ai-toolkit uninstall` |
+
+> **`npm update` w projekcie bez `package.json` nie zrobi nic** i zakończy się komunikatem
+> `up to date`. Nie jest to błąd instalacji: npm nie ma tam żadnej zadeklarowanej zależności
+> (`npm ls @ludio71/ai-toolkit` pokaże `(empty)`), a pliki wgrane przez `npx` są poza jego
+> ewidencją. Aktualizacja polega na ponownym uruchomieniu instalatora.
+
+Instalator wypisuje, co faktycznie zrobił — dzięki temu widać różnicę między udaną
+aktualizacją a brakiem zmian:
+
+```text
+@ludio71/ai-toolkit: 0.2.2 -> 0.3.0 w /projekt
+  skille (2): code-review, test-skill
+  nowe: test-skill
+  plikow: 4
 ```
+
+Zainstalowaną u siebie wersję sprawdzisz w `.claude/.ai-toolkit-manifest.json`,
+najnowszą w rejestrze — przez `npm view @ludio71/ai-toolkit version`.
 
 Instalator jest **idempotentny**: powtórna instalacja podmienia zawartość bloku między
 znacznikami i nie tyka niczego poza nim.

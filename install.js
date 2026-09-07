@@ -12,20 +12,36 @@ const END = `<!-- END ${PACKAGE_NAME} -->`;
 const MANIFEST = ".ai-toolkit-manifest.json";
 const SKILLS_DIR = path.join(".claude", "skills");
 
+/** Czy ścieżka leży w ulotnym cache `npx`, a nie w projekcie użytkownika. */
+function isNpxCache(target) {
+  return target.split(path.sep).includes("_npx");
+}
+
 /**
- * Katalog projektu konsumenta. Przy `npm install` jesteśmy w node_modules/<scope>/<pkg>,
- * więc pierwszy przodek o nazwie node_modules wskazuje korzeń projektu. Przy uruchomieniu
- * ręcznym (`npx ai-toolkit install`) tej ścieżki nie ma i liczy się cwd.
+ * Katalog projektu konsumenta.
+ *
+ * Przy `npm install` jako zależność siedzimy w node_modules/<scope>/<pkg>, więc pierwszy
+ * przodek o nazwie node_modules wskazuje korzeń projektu.
+ *
+ * Przy `npx` ten sam spacer trafia w cache npx (…/_npx/<hash>/node_modules/…) — czyli
+ * w katalog tymczasowy, nie w projekt. To jest właśnie ścieżka projektów bez package.json
+ * (Python, Go, Rust), więc korzeń bierzemy wtedy z katalogu wywołania komendy.
  */
 function findProjectRoot() {
   if (process.env.PROJECT_ROOT) return process.env.PROJECT_ROOT;
 
   let dir = __dirname;
   while (dir !== path.dirname(dir)) {
-    if (path.basename(dir) === "node_modules") return path.dirname(dir);
+    if (path.basename(dir) === "node_modules") {
+      const candidate = path.dirname(dir);
+      if (!isNpxCache(candidate)) return candidate;
+      break;
+    }
     dir = path.dirname(dir);
   }
-  return process.cwd();
+
+  // INIT_CWD ustawia npm na katalog, z którego wywołano komendę.
+  return process.env.INIT_CWD || process.cwd();
 }
 
 function copyDir(source, target, collected, skillRoot) {
@@ -143,6 +159,11 @@ function main() {
 
 if (require.main === module) {
   try {
+    // `npx` najpierw rozpakowuje paczkę do cache i odpala tam postinstall. Nie ma wtedy
+    // projektu do zapisania — instalacja dzieje się dopiero przy jawnym `ai-toolkit install`.
+    if (process.env.npm_lifecycle_event === "postinstall" && isNpxCache(__dirname)) {
+      process.exit(0);
+    }
     main();
   } catch (error) {
     // postinstall nie moze wywrocic `npm install` konsumenta
@@ -150,4 +171,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { main, applyRulesBlock, findProjectRoot, BEGIN, END };
+module.exports = { main, applyRulesBlock, findProjectRoot, isNpxCache, BEGIN, END };

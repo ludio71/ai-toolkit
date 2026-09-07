@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Weryfikacja instalatora na jednorazowym projekcie w katalogu tymczasowym.
- * Sprawdza cztery wlasnosci z planu: instalacje, idempotencje, guardy i czysta deinstalacje.
+ * Sprawdza pięć własności: instalację, idempotencję, guardy, czystą deinstalację oraz
+ * wyznaczanie korzenia projektu poza ekosystemem npm (Python/Go/Rust przez npx).
  */
 
 const fs = require("node:fs");
@@ -99,6 +100,31 @@ check(
   "zostal osierocony katalog",
 );
 check("manifest usuniety", !fs.existsSync(manifestPath));
+
+// --- 5. Projekt bez package.json (Python/Go/Rust) uruchamiany przez npx ---
+// Regresja: spacer po node_modules trafial w cache npx, wiec skille ladowaly w katalogu
+// tymczasowym zamiast w projekcie uzytkownika.
+console.log("\n5. korzen projektu poza ekosystemem npm");
+
+const npxLike = path.join(root, "..", "_npx", "abc123", "node_modules", "@ludio71", "ai-toolkit");
+check("cache npx rozpoznany jako nie-projekt", install.isNpxCache(npxLike));
+check(
+  "zwykly node_modules nadal traktowany jak projekt",
+  !install.isNpxCache(path.join(root, "node_modules", "@ludio71", "ai-toolkit")),
+);
+
+const pyRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ai-toolkit-py-"));
+fs.writeFileSync(path.join(pyRoot, "pyproject.toml"), '[project]\nname = "demo"\n');
+withProjectRoot(pyRoot, () => install.main());
+check(
+  "skill wyladowal w projekcie bez package.json",
+  fs.existsSync(path.join(pyRoot, ".claude", "skills", "code-review", "SKILL.md")),
+);
+check("CLAUDE.md utworzony od zera", fs.existsSync(path.join(pyRoot, "CLAUDE.md")));
+
+withProjectRoot(pyRoot, () => uninstall.main());
+check("deinstalacja w projekcie bez package.json", !fs.existsSync(path.join(pyRoot, ".claude")));
+fs.rmSync(pyRoot, { recursive: true, force: true });
 
 fs.rmSync(root, { recursive: true, force: true });
 

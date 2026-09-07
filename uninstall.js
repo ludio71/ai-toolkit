@@ -4,22 +4,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const pkg = require("./package.json");
+// Korzeń projektu wyznaczamy tą samą funkcją co instalator — inaczej `npx uninstall`
+// szukałby manifestu w cache npx zamiast w projekcie użytkownika.
+const { findProjectRoot } = require("./install.js");
 
 const PACKAGE_NAME = pkg.name;
 const BEGIN = `<!-- BEGIN ${PACKAGE_NAME} -->`;
 const END = `<!-- END ${PACKAGE_NAME} -->`;
 const MANIFEST = ".ai-toolkit-manifest.json";
-
-function findProjectRoot() {
-  if (process.env.PROJECT_ROOT) return process.env.PROJECT_ROOT;
-
-  let dir = __dirname;
-  while (dir !== path.dirname(dir)) {
-    if (path.basename(dir) === "node_modules") return path.dirname(dir);
-    dir = path.dirname(dir);
-  }
-  return process.cwd();
-}
 
 function removeRulesBlock(content) {
   const start = content.indexOf(BEGIN);

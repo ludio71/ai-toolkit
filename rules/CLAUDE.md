@@ -23,3 +23,7 @@ Nie improwizuj własnej listy kontrolnej obok niego.
 Skille i reguły pochodzą z paczki `@ludio71/ai-toolkit`. Nie edytuj ich w miejscu — poprawka
 zrobiona lokalnie zniknie przy najbliższym `npm install`. Zmiany wprowadzasz w repozytorium
 źródła prawdy i podbijasz wersję paczki.
+
+### Wersjonowanie
+
+Ma być zgodne z semver.

@@ -14,6 +14,9 @@ Uzasadnienie wyboru modelu dystrybucji: [`context/team/distribution-decision.md`
 
 ## Instalacja u konsumenta
 
+Kolejność ma znaczenie: **bez kroku 2 krok 3 kończy się błędem `E401`**, niezależnie od tego,
+czy paczka jest publiczna.
+
 **1. Zmapuj scope na GitHub Packages.** W repozytorium konsumenta, plik `.npmrc` (commitowany):
 
 ```
@@ -22,15 +25,32 @@ Uzasadnienie wyboru modelu dystrybucji: [`context/team/distribution-decision.md`
 
 Ten plik zawiera **wyłącznie** mapowanie. Token nigdy do niego nie wchodzi.
 
-**2. Uwierzytelnij się.** Rejestr npm GitHub Packages wymaga tokena także dla paczek publicznych.
+**2. Uwierzytelnij się.** Rejestr npm GitHub Packages wymaga tokena także dla paczek
+publicznych — inaczej niż `ghcr.io` dla obrazów kontenerów. To najczęstsze miejsce, w którym
+instalacja się wywraca.
 
-Lokalnie — raz na maszynę:
+Potrzebujesz tokena GitHuba z uprawnieniem `read:packages`. Jeśli masz `gh`, wypisze go
+`gh auth token`.
+
+*Lokalnie, raz na maszynę* — token trafia do twojego `~/.npmrc` (na Windowsie
+`C:\Users\<user>\.npmrc`), poza jakimkolwiek repozytorium:
 
 ```bash
-npm login --scope=@ludio71 --registry=https://npm.pkg.github.com
+npm config set "//npm.pkg.github.com/:_authToken" "<TWOJ_TOKEN>"
 ```
 
-W CI — token ze zmiennej środowiskowej, doklejany dopiero na czas instalacji:
+Działa tak samo w `cmd.exe`, PowerShellu i bashu. Sprawdzenie, że podziałało:
+
+```bash
+npm view @ludio71/ai-toolkit version
+```
+
+> Alternatywa: `npm login --scope=@ludio71 --auth-type=legacy --registry=https://npm.pkg.github.com`
+> (username = twój login GitHub, password = **token**, nie hasło do konta).
+> Flaga `--auth-type=legacy` jest obowiązkowa: od npm 9 domyślnym trybem jest logowanie przez
+> przeglądarkę, którego GitHub Packages nie obsługuje.
+
+*W CI* — token ze zmiennej środowiskowej, doklejany dopiero na czas instalacji:
 
 ```yaml
 - uses: actions/setup-node@v5
@@ -55,25 +75,39 @@ npm install @ludio71/ai-toolkit
 
 `postinstall` układa artefakty na miejscu. Ręcznie: `npx ai-toolkit install`.
 
+**Projekt bez `package.json`?** Nie używaj `npm install` — patrz sekcja niżej.
+
 ## Projekt bez `package.json` (Python, Go, Rust)
 
 Paczka jest npm-owa, ale artefakty w niej to zwykłe pliki tekstowe — projekt konsumenta
-nie musi mieć nic wspólnego z JavaScriptem. Potrzebny jest wyłącznie zainstalowany Node
-(≥20), żeby uruchomić instalator.
+nie musi mieć nic wspólnego z JavaScriptem. Jedyny wymóg to zainstalowany Node (≥20),
+żeby uruchomić instalator.
 
-Różnica jest jedna: zamiast dodawać zależność do `package.json`, wołasz instalator wprost.
+Różnice względem projektu npmowego są dwie:
+
+- **nie** dodajesz zależności do `package.json` — wołasz instalator wprost przez `npx`
+- `npm install` byłby tu błędem: utworzyłby `package.json` i `node_modules` w repo, które
+  z npm nie ma nic wspólnego
+
+Uwierzytelnienie jest identyczne jak w kroku 2 wyżej i musi być zrobione **przed** instalacją.
 
 ```bash
 cd ~/projekty/moj-projekt-python      # katalog z pyproject.toml, go.mod, Cargo.toml…
+```
 
-printf '@ludio71:registry=https://npm.pkg.github.com\n' > .npmrc
-printf '//npm.pkg.github.com/:_authToken=${GH_PKG_TOKEN}\n' >> .npmrc
+Plik `.npmrc` w tym katalogu — jedna linia, bez tokena:
 
-export GH_PKG_TOKEN="$(gh auth token)"   # albo raz: npm login --scope=@ludio71 …
+```
+@ludio71:registry=https://npm.pkg.github.com
+```
+
+Potem instalacja:
+
+```bash
 npx @ludio71/ai-toolkit@latest install
 ```
 
-Efekt jest identyczny jak w projekcie npmowym:
+Efekt:
 
 ```text
 moj-projekt-python/
@@ -92,6 +126,10 @@ własnego cache, a instalator kopiuje z niego pliki do projektu. Aktualizacja to
 
 > Ten tryb jest **kopiujący**, nie linkujący: cache `npx` jest ulotny, więc dowiązania
 > symboliczne przestałyby działać zaraz po zakończeniu komendy.
+
+Bez lockfile'a nic nie pilnuje aktualności artefaktów — w projekcie npmowym robi to
+`npm update`, tutaj musisz sam powtórzyć `install`. Wersję, którą masz u siebie, sprawdzisz
+w `.claude/.ai-toolkit-manifest.json`.
 
 ## Aktualizacja i deinstalacja
 

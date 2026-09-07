@@ -1,0 +1,6 @@
+node_modules/
+*.tgz
+.npmrc
+
+# Materiały kursowe 10xDevs — nie trafiają do publicznego repo
+.claude/

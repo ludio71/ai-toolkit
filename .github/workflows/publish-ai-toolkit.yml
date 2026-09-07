@@ -1,0 +1,81 @@
+name: Publish AI Toolkit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@ludio71"
+
+      # --ignore-scripts: bez tego postinstall zainstalowalby paczke sama w siebie
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate package metadata and skills
+        run: npm run validate
+
+      - name: Verify installer end-to-end
+        run: npm run test:e2e
+
+      - name: Check package contents
+        run: npm pack --dry-run
+
+  publish:
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@ludio71"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # GitHub Packages odrzuca duplikat wersji bledem 409. Push do main bez podbicia
+      # wersji jest normalna sytuacja (poprawka README, zmiana w context/), wiec zamiast
+      # czerwonego pipeline'u pomijamy publikacje swiadomie.
+      - name: Check whether version is already published
+        id: check
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "@ludio71/ai-toolkit@$VERSION" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::wersja $VERSION juz jest w rejestrze — publikacja pominieta"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to GitHub Packages
+        if: steps.check.outputs.already == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check.outputs.already }}" = "true" ]; then
+            echo "### Publikacja pominieta — @ludio71/ai-toolkit@${{ steps.check.outputs.version }} juz istnieje" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Opublikowano @ludio71/ai-toolkit@${{ steps.check.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          fi

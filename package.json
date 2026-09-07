@@ -1,0 +1,33 @@
+{
+  "name": "@ludio71/ai-toolkit",
+  "version": "0.1.0",
+  "description": "Wspoldzielone artefakty AI (skille i reguly) dystrybuowane przez GitHub Packages",
+  "license": "UNLICENSED",
+  "author": "Jacek Szpyrka",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ludio71/ai-toolkit.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "ai-toolkit": "cli.js"
+  },
+  "files": [
+    "skills/",
+    "rules/",
+    "install.js",
+    "uninstall.js",
+    "cli.js",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node install.js",
+    "validate": "node scripts/validate.js",
+    "test:e2e": "node scripts/verify-install.js"
+  }
+}

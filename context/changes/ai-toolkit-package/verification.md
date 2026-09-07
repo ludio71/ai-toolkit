@@ -83,3 +83,48 @@ Weryfikacja rozszerzona o sekcję 5 (**21 asercji**): rozpoznanie cache npx, ins
 i deinstalacja w projekcie z `pyproject.toml` zamiast `package.json`. Potwierdzone na żywym
 rejestrze — `npx @ludio71/ai-toolkit@latest install` w katalogu Pythonowym układa
 `.claude/skills/` i blok w `CLAUDE.md`, nie tworząc `node_modules`.
+
+## Uzupełnienie 2026-09-07, wieczór — dwie luki z realnego użycia
+
+Testy na projekcie `jsz-py-test` (Python, bez `package.json`) odsłoniły kolejne dwie rzeczy,
+których nie widziały asercje z katalogu tymczasowego.
+
+**1. Instalator nie odróżniał aktualizacji od braku zmian.** Komunikat brzmiał
+„zainstalowano N plik(ow)" niezależnie od tego, czy wersja się zmieniła. Użytkownik nie miał
+jak stwierdzić, czy `install` cokolwiek zrobił — pytanie „nic mi nie podmienił" wzięło się
+wprost stąd. Instalator wypisuje teraz przejście między wersjami oraz listę skilli nowych
+i wycofanych:
+
+```text
+@ludio71/ai-toolkit: 0.2.2 -> 0.3.0 w /projekt
+  skille (2): code-review, test-skill
+  nowe: test-skill
+  plikow: 4
+```
+
+**2. Skill wycofany z paczki zostawał u konsumenta na zawsze.** `installSkills()` podmieniał
+wyłącznie katalogi obecne w aktualnej paczce, więc artefakt usunięty w nowej wersji nigdy nie
+znikał — dokładnie „osad po pięciu wersjach skilla" z listy wymagań lekcji. Różnica liczona
+jest teraz względem poprzedniego manifestu, więc usuwane są tylko skille, które ta paczka
+wcześniej zainstalowała; cudzych plików w `.claude/skills/` instalator nie rusza.
+
+Weryfikacja: **25 asercji**, sekcja 6 pokrywa wycofanie skilla (usunięcie osieroconego,
+zachowanie pozostałych, aktualizacja manifestu).
+
+### Potwierdzenie na cudzym scenariuszu
+
+Wersje `0.3.2` i `0.3.3` powstały poza tym planem — właściciel repo samodzielnie zmienił nazwę
+skilla i wycofał skill testowy. Obie operacje przeszły przez pełen łańcuch (commit → CI →
+rejestr → `npx install` u konsumenta), a projekt konsumenta skończył z jednym skillem
+i manifestem `0.3.3`. To mocniejszy dowód niż test syntetyczny: mechanizm zniósł zmiany,
+których nie zaprojektowałem.
+
+### Dokumentacja — dwie poprawki po realnych potknięciach
+
+- **`E401` przy instalacji.** README polecał `npm login` bez `--auth-type=legacy`; od npm 9
+  domyślne logowanie idzie przez przeglądarkę, której GitHub Packages nie obsługuje. Sekcja
+  dla Pythona używała przy tym składni bashowej (`export`) w instrukcji uruchamianej z
+  `cmd.exe`. Zastąpione komendą `npm config set` działającą we wszystkich trzech powłokach.
+- **`npm update` w projekcie bez `package.json`** kończy się komunikatem `up to date` i nie
+  robi nic, bo npm nie ma tam zadeklarowanej zależności. README rozdziela teraz obie ścieżki
+  aktualizacji tabelą.

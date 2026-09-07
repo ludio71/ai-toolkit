@@ -126,6 +126,32 @@ function installRules(projectRoot) {
   return ["CLAUDE.md"];
 }
 
+/** Poprzedni manifest, jesli paczka byla juz tu instalowana. */
+function readPreviousManifest(projectRoot) {
+  const manifestPath = path.join(projectRoot, ".claude", MANIFEST);
+  if (!fs.existsSync(manifestPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  } catch {
+    return null; // uszkodzony manifest traktujemy jak brak historii
+  }
+}
+
+/**
+ * Skille, ktore byly w poprzedniej wersji paczki, a w tej juz ich nie ma.
+ * Bez tego kroku artefakt usuniety z paczki zostawalby u konsumenta na zawsze.
+ */
+function removeDroppedSkills(projectRoot, previous, current) {
+  const previousSkills = Object.keys((previous && previous.files && previous.files.skills) || {});
+  const dropped = previousSkills.filter((name) => !(name in current));
+
+  const skillsRoot = path.join(projectRoot, SKILLS_DIR);
+  for (const name of dropped) {
+    fs.rmSync(path.join(skillsRoot, name), { recursive: true, force: true });
+  }
+  return dropped;
+}
+
 function writeManifest(projectRoot, skills, rules) {
   const manifestDir = path.join(projectRoot, ".claude");
   fs.mkdirSync(manifestDir, { recursive: true });
@@ -145,16 +171,30 @@ function writeManifest(projectRoot, skills, rules) {
 
 function main() {
   const projectRoot = findProjectRoot();
+  const previous = readPreviousManifest(projectRoot);
+
   const skills = installSkills(projectRoot);
   const rules = installRules(projectRoot);
+  const dropped = removeDroppedSkills(projectRoot, previous, skills);
   writeManifest(projectRoot, skills, rules);
 
   const fileCount =
     Object.values(skills).reduce((sum, s) => sum + s.files.length, 0) + rules.length;
-  console.log(
-    `${PACKAGE_NAME}@${PACKAGE_VERSION}: zainstalowano ${fileCount} plik(ow) ` +
-      `(${Object.keys(skills).length} skill/e) w ${projectRoot}`,
-  );
+  const names = Object.keys(skills);
+  const previousNames = Object.keys((previous && previous.files && previous.files.skills) || {});
+  const added = names.filter((name) => !previousNames.includes(name));
+
+  // Bez tej roznicy komunikat wyglada tak samo, gdy cos sie zmienilo i gdy nic sie nie zmienilo.
+  let header;
+  if (!previous) header = `${PACKAGE_VERSION} (nowa instalacja)`;
+  else if (previous.version === PACKAGE_VERSION) header = `${PACKAGE_VERSION} (ponownie ta sama wersja)`;
+  else header = `${previous.version} -> ${PACKAGE_VERSION}`;
+
+  console.log(`${PACKAGE_NAME}: ${header} w ${projectRoot}`);
+  console.log(`  skille (${names.length}): ${names.join(", ") || "brak"}`);
+  if (added.length > 0) console.log(`  nowe: ${added.join(", ")}`);
+  if (dropped.length > 0) console.log(`  usuniete z paczki: ${dropped.join(", ")}`);
+  console.log(`  plikow: ${fileCount}`);
 }
 
 if (require.main === module) {

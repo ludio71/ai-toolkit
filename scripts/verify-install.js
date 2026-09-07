@@ -126,6 +126,38 @@ withProjectRoot(pyRoot, () => uninstall.main());
 check("deinstalacja w projekcie bez package.json", !fs.existsSync(path.join(pyRoot, ".claude")));
 fs.rmSync(pyRoot, { recursive: true, force: true });
 
+// --- 6. Skill usuniety z paczki znika u konsumenta ---
+// Regresja: instalator podmienial tylko katalogi obecne w paczce, wiec artefakt
+// wycofany w nowej wersji zostawal u konsumenta na zawsze.
+console.log("\n6. wycofanie skilla z paczki");
+
+const dropRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ai-toolkit-drop-"));
+const staleSkill = path.join(dropRoot, ".claude", "skills", "stary-skill");
+
+withProjectRoot(dropRoot, () => install.main());
+
+// symulujemy stan po instalacji wersji, ktora miala dodatkowy skill
+fs.mkdirSync(staleSkill, { recursive: true });
+fs.writeFileSync(path.join(staleSkill, "SKILL.md"), "---\nname: stary-skill\n---\n");
+const dropManifestPath = path.join(dropRoot, ".claude", ".ai-toolkit-manifest.json");
+const dropManifest = JSON.parse(fs.readFileSync(dropManifestPath, "utf8"));
+dropManifest.version = "0.0.1";
+dropManifest.files.skills["stary-skill"] = { files: ["SKILL.md"] };
+fs.writeFileSync(dropManifestPath, JSON.stringify(dropManifest, null, 2));
+
+withProjectRoot(dropRoot, () => install.main());
+
+check("skill wycofany z paczki zostal usuniety", !fs.existsSync(staleSkill));
+check(
+  "skill nadal obecny w paczce przetrwal",
+  fs.existsSync(path.join(dropRoot, ".claude", "skills", "code-review", "SKILL.md")),
+);
+const afterDrop = JSON.parse(fs.readFileSync(dropManifestPath, "utf8"));
+check("manifest nie wspomina juz o wycofanym skillu", !("stary-skill" in afterDrop.files.skills));
+check("manifest ma podbita wersje", afterDrop.version === require("../package.json").version);
+
+fs.rmSync(dropRoot, { recursive: true, force: true });
+
 fs.rmSync(root, { recursive: true, force: true });
 
 console.log(`\n${failures === 0 ? "WSZYSTKO ZIELONE" : `${failures} niepowodzen`}`);
